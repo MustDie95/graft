@@ -12,7 +12,7 @@ RUN cd /opt && git clone --recursive https://github.com/graft-project/graft-ng.g
     git checkout alpha3 && \
     git submodule update --init --recursive
 
-RUN cd /opt/graft-ng && mkdir -p build && cd build && cmake -DENABLE_SYSLOG=ON .. && make -j$(nproc --all)
+RUN cd /opt/graft-ng && mkdir -p build && cd build && cmake -DENABLE_SYSLOG=ON -DBoost_USE_STATIC_LIBS=ON -DBoost_USE_STATIC_RUNTIME=ON .. && make -j$(nproc --all)
 
 RUN mkdir /opt/graft && cp /opt/graft-ng/build/BUILD/cryptonode/bin/* /opt/graft && cp /opt/graft-ng/build/graft_server /opt/graft && cp /opt/graft-ng/build/config.ini /opt/graft
 
@@ -21,9 +21,21 @@ RUN mkdir /opt/graft && cp /opt/graft-ng/build/BUILD/cryptonode/bin/* /opt/graft
 ############################################################################################################################################
 
 FROM ubuntu:18.04 as production
+
+RUN apt-get update && apt-get install --no-install-recommends -y supervisor
+
+COPY supervisor/etc/supervisor/ /etc/supervisor
+
+RUN apt-get clean && rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/*
+
 COPY --from=build /opt/graft /opt
+
 RUN mkdir /root/.graft
-VOLUME ["/root/.graft"]
-CMD ["/bin/bash"]
+
+EXPOSE 28690
+
+WORKDIR /opt
+
+CMD ["/usr/bin/supervisord", "-n", "-c", "/etc/supervisor/supervisord.conf"]
 
 ############################################################################################################################################
